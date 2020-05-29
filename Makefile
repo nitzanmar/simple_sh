@@ -1,4 +1,4 @@
-CFLAGS=-Wall -Wextra -Weffc++ -Wsign-conversion -Werror -pedantic-errors -g3
+CFLAGS=-Wall -Wextra -Weffc++ -Wsign-conversion -pedantic-errors -g3
 
 all: main
 

@@ -7,24 +7,48 @@
 #define TOKEN_DELIM " \t\r\n\a"
 #define TOKEN_BUFSIZE 64
 
-enum bool {
-    false,
-    true
-};
+typedef enum bool { false, true } bool;
 
+/*
+ * main routine funcs declarations
+ */
 void main_loop(void);
 char* read_line(void);
 char** parse_args(char* line);
-enum bool exec_cmd(char** args);
+bool exec_args(char **args);
+bool exec_nonbuiltin_cmd(char** args);
 
-//int main(int argc, char **argv)
+/* 
+ * "builtins" section
+ */
+bool builtin_help(char **args);
+bool builtin_exit(char **args);
+bool builtin_cd(char **args);
+
+// the builtins arrays must keep the same index for builtin name and func pointer
+char const *builtins[] = { "help", "exit", "cd" };
+bool (* const builtins_funcs[])(char **) = { &builtin_help, &builtin_exit, &builtin_cd };
+int const num_builtins = sizeof(builtins) / sizeof(char *);
+
 int main(void)
 {
-    // init shell configs
-    // run main shell loop
     main_loop();
-    // clenaup before shutdown
     return EXIT_SUCCESS;
+}
+
+bool exec_args(char **args)
+{
+    if (args[0] == NULL) {
+        return true;
+    }
+
+    for (int i = 0; i < num_builtins; ++i) {
+        if (strcmp(args[0], builtins[i]) == 0) {
+            return (*builtins_funcs[i])(args);
+        }
+    }
+
+    return exec_nonbuiltin_cmd(args);
 }
 
 void main_loop(void)
@@ -37,7 +61,7 @@ void main_loop(void)
         printf("%s", "$> ");
         line = read_line();
         args = parse_args(line);
-        should_continue = exec_cmd(args);
+        should_continue = exec_args(args);
 
         if (line) {
             free(line);
@@ -101,7 +125,7 @@ char** parse_args(char* line)
     return tokens;
 }
 
-enum bool exec_cmd(char** args)
+bool exec_nonbuiltin_cmd(char** args)
 {
     int status;
     pid_t wpid;
@@ -119,6 +143,42 @@ enum bool exec_cmd(char** args)
         do {
             wpid = waitpid(pid, &status, WUNTRACED);
         } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+    }
+
+    return true;
+}
+
+bool builtin_help(char **args)
+{
+    printf("%s\n%s\n%s\n", "simple_sh (more like stupid shell).",
+            "Type your command and args, and press ENTER to execute.",
+            "The following commands are shell builtins:");
+
+    for (int i = 0; i < num_builtins; ++i) {
+        printf("\t%s\n", builtins[i]);
+    }
+
+    printf("Use the man command for information on other programs.\n");
+
+    return true;
+}
+
+bool builtin_exit(char **args)
+{
+    return false;
+}
+
+bool builtin_cd(char **args)
+{
+    if (args[0] == NULL) {
+        fprintf(stderr, "%s\n", "directory path is expected in `cd` command");
+        return true;
+    }
+
+    if (chdir(args[1]) != 0) {
+        char err[1024];
+        sprintf(err, "Failed to change dir to - %s", args[1]);
+        perror(err);
     }
 
     return true;
